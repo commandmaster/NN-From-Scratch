@@ -135,11 +135,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DataLoader.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="NeuralNetwork.cpp" />
     <ClCompile Include="NeuralRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DataLoader.h" />
     <ClInclude Include="NeuralNetwork.h" />
     <ClInclude Include="NeuralRenderer.h" />
   </ItemGroup>

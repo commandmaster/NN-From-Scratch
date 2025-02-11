@@ -14,18 +14,18 @@ inline Scalar sigmoid(Scalar x)
 	return 1.f / (1.f + std::exp(-x));
 }
 
-template<size_t Input_Layer, size_t... OtherLayers>
+template<size_t InputLayer, size_t OutputLayer, size_t... HiddenLayers>
 class NeuralNetwork
 {
 public:
-	static constexpr size_t num_layers = sizeof...(OtherLayers) + 1; // Will always be the same with the same Layer template parameters, thus it can be constexpr static (I think?)
+	static constexpr size_t num_layers = sizeof...(HiddenLayers) + 2; // Will always be the same with the same Layer template parameters, thus it can be constexpr static (I think?)
 
     NeuralNetwork()
     {
         initialize();
     }
 
-	void forward(Eigen::Matrix<Scalar, 1, Input_Layer>& inputMatrix)
+	void forward(Eigen::Matrix<Scalar, 1, InputLayer>& inputMatrix)
 	{
 		neuronActivations[0] = inputMatrix;
 
@@ -35,9 +35,9 @@ public:
 		}
 	}
 
-	void print()
+	Scalar cost(const Eigen::Matrix<Scalar, 1, OutputLayer>& out, const Eigen::Matrix<Scalar, 1, OutputLayer>& expected)
 	{
-
+		return ((out - expected) * (out - expected)).sum() / OutputLayer;
 	}
 
 	std::array<Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>, num_layers - 1> weights;
@@ -45,7 +45,7 @@ public:
 
 	std::array<Eigen::Matrix<Scalar, 1, Eigen::Dynamic>, num_layers> neuronActivations;
    
-	std::array<size_t, num_layers> topology = { Input_Layer, OtherLayers... }; 
+	std::array<size_t, num_layers> topology = { InputLayer, HiddenLayers..., OutputLayer }; 
 
 private:
 	void initialize()
