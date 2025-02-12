@@ -25,17 +25,21 @@ int main() {
     auto images = DataLoader::load_mnist_images("./mnist/train-images.idx3-ubyte");
     auto labels = DataLoader::load_mnist_labels("./mnist/train-labels.idx1-ubyte");
 
+    Eigen::Matrix<Scalar, 1, 784> testImage = images.row(300);
+    Eigen::Matrix<Scalar, 1, 10> testLabel = labels.row(300);
     
     int index = 0;
     while (!WindowShouldClose()) 
     {
         BeginDrawing();
-
+        
 
         ClearBackground(RAYWHITE);
         myNN.train(images, labels, 0.001, index);
+        //myNN.test(testImage, testLabel);
 
         NeuralRenderer::RenderNetwork<784, 10, 80, 80>(myNN);
+
 
         EndDrawing();
 

@@ -17,9 +17,16 @@ inline Scalar sigmoid(Scalar x)
 }
 
 template<size_t cols>
-inline Eigen::Matrix<Scalar, 1, cols> softmax(Eigen::Matrix<Scalar, 1, cols>& rawOuput)
+inline Eigen::Matrix<Scalar, 1, cols> softmax(const Eigen::Matrix<Scalar, 1, cols>& rawOuput)
 {
+	auto newMatrix = rawOuput;
+	float sum = newMatrix.unaryExpr([](Scalar x) { return std::exp(x); }).sum();
+	for (int i = 0; i < rawOuput.cols(); ++i)
+	{
+		newMatrix(0, i) = std::exp(newMatrix(0, i)) / sum;
+	}
 
+	return newMatrix;
 }
 
 
@@ -60,7 +67,7 @@ public:
 		return predicted_index == expected_index;
 	}
 
-	void forward(Eigen::Matrix<Scalar, 1, InputLayer>& inputMatrix)
+	void forward(const Eigen::Matrix<Scalar, 1, InputLayer>& inputMatrix)
 	{
 		neuronActivations[0] = inputMatrix;
 
@@ -69,7 +76,9 @@ public:
 			neuronActivations[i] = (neuronActivations[i - 1] * weights[i - 1] + biases[i - 1]).unaryExpr([](Scalar x) { return sigmoid(x); });
 		}
 
-		neuronActivations[num_layers - 1] = soft(neuronActivations[i - 1] * weights[i - 1] + biases[i - 1]);
+		neuronActivations[num_layers - 1] = neuronActivations[num_layers - 2] * weights[num_layers - 2] + biases[num_layers - 2];
+		softmaxOutput = softmax<OutputLayer>(neuronActivations[num_layers - 1]);
+		neuronActivations[num_layers - 1] = (neuronActivations[num_layers - 1]).unaryExpr([](Scalar x) { return sigmoid(x); });
 	}
 
 	void backpropagate(const Eigen::Matrix<Scalar, 1, OutputLayer>& expected, Scalar learningRate)
@@ -86,6 +95,15 @@ public:
 			
 			error = delta * weights[i].transpose();
 		}
+	}
+
+	void test(const Eigen::Matrix<Scalar, 1, InputLayer>& image, const Eigen::Matrix<Scalar, 1, OutputLayer>& label)
+	{
+		forward(image);
+		RenderImageMatrix(image);
+
+
+		std::cout << "Confidence: " << softmaxOutput.row(0) << '\n';
 	}
 
 	void train(const Eigen::MatrixXf& images, const Eigen::MatrixXf& labels, Scalar learningRate, int index)
@@ -175,6 +193,7 @@ public:
 	std::array<Eigen::Matrix<Scalar, 1, Eigen::Dynamic>, num_layers - 1> biases;
 
 	std::array<Eigen::Matrix<Scalar, 1, Eigen::Dynamic>, num_layers> neuronActivations;
+	Eigen::Matrix<Scalar, 1, Eigen::Dynamic> softmaxOutput;
    
 	std::array<size_t, num_layers> topology = { InputLayer, HiddenLayers..., OutputLayer }; 
 

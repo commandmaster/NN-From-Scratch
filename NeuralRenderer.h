@@ -85,9 +85,16 @@ public:
                 float yPos = (j + 1) * (fScreenHeight / (neuronCount + 1));
 
                 // Draw neuron with activation-based transparency
-                DrawCircle(xPos, yPos, 4.0f, Color{ 255, 0, 0, static_cast<unsigned char>(255.f * activation) });
+                DrawCircle(xPos, yPos, fScreenHeight / (3.f*(float)neuronCount), Color{ 255, 0, 0, static_cast<unsigned char>(255.f * activation) });
                 //DrawRing(Vector2{ xPos, yPos }, 20.0f, 23.0f, 0, 360, 100, BLACK);
+
+				if (i == layerCount - 1)
+                {
+                    DrawText(std::to_string(static_cast<int>(nn.softmaxOutput(0, j) * 100)).c_str(), xPos - 5, yPos - 5, 20, BLACK);
+                }
             }
         }
+
+        
     }
 };
