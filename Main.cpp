@@ -6,6 +6,9 @@
 
 
 int main() {
+    std::ios_base::sync_with_stdio(false);
+    std::cin.tie(NULL);
+
 	const int screenWidth = 1600;
     const int screenHeight = 900;
 
@@ -14,28 +17,34 @@ int main() {
     SetTargetFPS(60);     
 
 
-    NeuralNetwork<784, 10, 128, 128> myNN;
+    NeuralNetwork<784, 10, 80, 80> myNN;
+    myNN.loadWeights("./weights.data");
 
 
-    auto images = DataLoader::load_mnist_images("./t10k-images.idx3-ubyte");
-       
 
-    Eigen::Matrix<Scalar, 1, 784> inputMatrix;
-    inputMatrix = images.row(0);
+    auto images = DataLoader::load_mnist_images("./mnist/train-images.idx3-ubyte");
+    auto labels = DataLoader::load_mnist_labels("./mnist/train-labels.idx1-ubyte");
 
-
-    myNN.forward(inputMatrix);
-
-
+    
+    int index = 0;
     while (!WindowShouldClose()) 
     {
         BeginDrawing();
 
-            ClearBackground(RAYWHITE);
 
-            //NeuralRenderer::RenderNetwork<8, 10, 8, 8>(myNN);
+        ClearBackground(RAYWHITE);
+        myNN.train(images, labels, 0.001, index);
+
+        NeuralRenderer::RenderNetwork<784, 10, 80, 80>(myNN);
 
         EndDrawing();
+
+        if (index % 3000 == 0)
+        {
+            myNN.saveWeights("./weights.data");
+            std::cout << "Saving weights and biases... \n";
+        }
+        index++;
     }
 
     CloseWindow();
