@@ -14,6 +14,10 @@
 #include <raylib.h>
 #include "Eigen/Core"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 typedef float Scalar;
 
 inline Scalar sigmoid(Scalar x)
@@ -143,19 +147,19 @@ public:
 			return;
 		}
 
-		for (size_t i = 0; i < num_layers - 1; ++i)
+		for (uint32_t i = 0; i < num_layers - 1; ++i)
 		{
-			size_t rows = weights[i].rows();
-			size_t cols = weights[i].cols();
-			file.write(reinterpret_cast<const char*>(&rows), sizeof(size_t));
-			file.write(reinterpret_cast<const char*>(&cols), sizeof(size_t));
+			uint32_t rows = weights[i].rows();
+			uint32_t cols = weights[i].cols();
+			file.write(reinterpret_cast<const char*>(&rows), sizeof(uint32_t));
+			file.write(reinterpret_cast<const char*>(&cols), sizeof(uint32_t));
 			file.write(reinterpret_cast<const char*>(weights[i].data()), rows * cols * sizeof(Scalar));
 		}
 
-		for (size_t i = 0; i < num_layers - 1; ++i)
+		for (uint32_t i = 0; i < num_layers - 1; ++i)
 		{
-			size_t cols = biases[i].cols();
-			file.write(reinterpret_cast<const char*>(&cols), sizeof(size_t));
+			uint32_t cols = biases[i].cols();
+			file.write(reinterpret_cast<const char*>(&cols), sizeof(uint32_t));
 			file.write(reinterpret_cast<const char*>(biases[i].data()), cols * sizeof(Scalar));
 		}
 
@@ -171,20 +175,20 @@ public:
 			return;
 		}
 
-		for (size_t i = 0; i < num_layers - 1; ++i)
+		for (uint32_t i = 0; i < num_layers - 1; ++i)
 		{
-			size_t rows, cols;
-			file.read(reinterpret_cast<char*>(&rows), sizeof(size_t));
-			file.read(reinterpret_cast<char*>(&cols), sizeof(size_t));
+			uint32_t rows, cols;
+			file.read(reinterpret_cast<char*>(&rows), sizeof(uint32_t));
+			file.read(reinterpret_cast<char*>(&cols), sizeof(uint32_t));
 
 			weights[i].resize(rows, cols);
 			file.read(reinterpret_cast<char*>(weights[i].data()), rows * cols * sizeof(Scalar));
 		}
 
-		for (size_t i = 0; i < num_layers - 1; ++i)
+		for (uint32_t i = 0; i < num_layers - 1; ++i)
 		{
-			size_t cols;
-			file.read(reinterpret_cast<char*>(&cols), sizeof(size_t));
+			uint32_t cols;
+			file.read(reinterpret_cast<char*>(&cols), sizeof(uint32_t));
 
 			biases[i].resize(1, cols);
 			file.read(reinterpret_cast<char*>(biases[i].data()), cols * sizeof(Scalar));
@@ -193,6 +197,106 @@ public:
 		file.close();
 	}
 
+	bool loadWeightsFromBuffer(const char* buffer_ptr, size_t buffer_size)
+	{
+        std::cout << "Attempting to load weights from buffer (" << buffer_size << " bytes)..." << std::endl;
+		if (!buffer_ptr || buffer_size == 0)
+		{
+			std::cerr << "Error: Invalid buffer provided to loadWeightsFromBuffer (null or zero size)." << std::endl;
+			return false;
+		}
+
+		const char* current_ptr = buffer_ptr;
+		const char* end_ptr = buffer_ptr + buffer_size; 
+
+		for (uint32_t i = 0; i < num_layers - 1; ++i)
+		{
+			uint32_t rows, cols;
+			size_t needed_size = sizeof(uint32_t) * 2; 
+
+			if (current_ptr + needed_size > end_ptr) {
+				std::cerr << "Error: Buffer too small while trying to read dimensions for weights layer " << i << "." << std::endl;
+                std::cerr << "  Remaining buffer size: " << (end_ptr - current_ptr) << " bytes." << std::endl;
+                std::cerr << "  Needed: " << needed_size << " bytes." << std::endl;
+				return false;
+			}
+
+			std::memcpy(&rows, current_ptr, sizeof(uint32_t));
+			current_ptr += sizeof(uint32_t);
+			std::memcpy(&cols, current_ptr, sizeof(uint32_t));
+			current_ptr += sizeof(uint32_t);
+
+            if (rows != topology[i] || cols != topology[i+1]) {
+                std::cerr << "Warning: Dimension mismatch in buffer for weights layer " << i
+                          << ". Expected " << topology[i] << "x" << topology[i+1]
+                          << ", Got " << rows << "x" << cols << ". Resizing." << std::endl;
+            }
+
+
+			weights[i].resize(rows, cols);
+
+			size_t data_size = static_cast<size_t>(rows) * cols * sizeof(Scalar);
+			if (current_ptr + data_size > end_ptr) {
+				std::cerr << "Error: Buffer too small while trying to read data for weights layer " << i << "." << std::endl;
+                std::cerr << "  Remaining buffer size: " << (end_ptr - current_ptr) << " bytes." << std::endl;
+                std::cerr << "  Needed: " << data_size << " bytes." << std::endl;
+				return false;
+			}
+
+			std::memcpy(weights[i].data(), current_ptr, data_size);
+			current_ptr += data_size;
+
+		}
+
+		for (uint32_t i = 0; i < num_layers - 1; ++i)
+		{
+			uint32_t cols;
+			size_t needed_size = sizeof(uint32_t); 
+
+			if (current_ptr + needed_size > end_ptr) {
+				std::cerr << "Error: Buffer too small while trying to read dimension for bias layer " << i << "." << std::endl;
+                std::cerr << "  Remaining buffer size: " << (end_ptr - current_ptr) << " bytes." << std::endl;
+                std::cerr << "  Needed: " << needed_size << " bytes." << std::endl;
+				return false;
+			}
+
+			std::memcpy(&cols, current_ptr, sizeof(uint32_t));
+			current_ptr += sizeof(uint32_t);
+
+            if (cols != topology[i+1]) {
+                std::cerr << "Warning: Dimension mismatch in buffer for bias layer " << i
+                          << ". Expected 1x" << topology[i+1]
+                          << ", Got 1x" << cols << ". Resizing." << std::endl;
+            }
+
+			biases[i].resize(1, cols);
+
+			size_t data_size = static_cast<size_t>(cols) * sizeof(Scalar);
+			if (current_ptr + data_size > end_ptr) {
+				std::cerr << "Error: Buffer too small while trying to read data for bias layer " << i << "." << std::endl;
+                std::cerr << "  Remaining buffer size: " << (end_ptr - current_ptr) << " bytes." << std::endl;
+                std::cerr << "  Needed: " << data_size << " bytes." << std::endl;
+				return false;
+			}
+
+			std::memcpy(biases[i].data(), current_ptr, data_size);
+			current_ptr += data_size;
+		}
+
+        if (current_ptr != end_ptr) 
+		{
+            std::cerr << "Warning: Buffer not fully consumed after loading weights. "
+                      << (end_ptr - current_ptr) << " bytes remaining." << std::endl;
+        } 
+		else 
+		{
+             std::cout << "Buffer fully consumed." << std::endl;
+        }
+
+
+		std::cout << "Weights loaded successfully from buffer." << std::endl;
+		return true; 
+	}
 
 	std::array<Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>, num_layers - 1> weights;
 	std::array<Eigen::Matrix<Scalar, 1, Eigen::Dynamic>, num_layers - 1> biases;

@@ -4,88 +4,299 @@
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 
-    <title>raylib web game</title>
+    <title>NN from scratch - raylib</title> <!-- Updated Title -->
 
-    <meta name="title" content="raylib web game">
-    <meta name="description" content="New raylib web videogame, developed using raylib videogames library">
-    <meta name="keywords" content="raylib, programming, examples, html5, C, C++, library, learn, games, videogames">
+    <meta name="title" content="NN from scratch - raylib">
+    <meta name="description" content="Neural network visualization using raylib and C++">
+    <meta name="keywords" content="raylib, programming, examples, html5, C, C++, library, learn, games, videogames, neural network, machine learning, emscripten">
     <meta name="viewport" content="width=device-width">
 
-    <!-- Open Graph metatags for sharing -->
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="raylib web game">
-    <meta property="og:image:type" content="image/png">
-    <meta property="og:image" content="https://www.raylib.com/common/raylib_logo.png">
-    <meta property="og:image:alt" content="New raylib web videogame, developed using raylib videogames library" />
-    <meta property="og:site_name" content="raylib - example">
-    <meta property="og:url" content="https://www.raylib.com/games.html">
-    <meta property="og:description" content="New raylib web videogame, developed using raylib videogames library">
+    <!-- Open Graph metatags -->
+    <meta property="og:title" content="NN from scratch - raylib">
+    <meta property="og:description" content="Neural network visualization using raylib and C++">
+    <!-- Add other OG tags as desired -->
 
-    <!-- Twitter metatags for sharing -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:site" content="@raysan5">
-    <meta name="twitter:title" content="raylib web game">
-    <meta name="twitter:image" content="https://www.raylib.com/common/raylib_logo.png">
-    <meta name="twitter:image:alt" content="New raylib web videogame, developed using raylib videogames library">
-    <meta name="twitter:url" content="https://www.raylib.com/games.html">
-    <meta name="twitter:description" content="New raylib web videogame, developed using raylib videogames library">
+    <!-- Twitter metatags -->
+    <meta name="twitter:title" content="NN from scratch - raylib">
+    <meta name="twitter:description" content="Neural network visualization using raylib and C++">
+     <!-- Add other Twitter tags as desired -->
 
     <!-- Favicon -->
     <link rel="shortcut icon" href="https://www.raylib.com/favicon.ico">
 
     <style>
-        body { 
-          margin: 0px; 
-          overflow: hidden; 
-          background-color: black;
+        body {
+          margin: 0px;
+          overflow: hidden; /* Prevent scrollbars */
+          background-color: #f0f0f0; /* Light gray background */
+          font-family: sans-serif;
+          display: flex; /* Use flexbox for layout */
+          flex-direction: column; /* Stack controls above canvas */
+          height: 100vh; /* Full viewport height */
         }
-        canvas.emscripten { border: 0px none; background-color: black;}
+        #controls {
+            padding: 10px;
+            background-color: #e0e0e0; /* Slightly darker gray for controls */
+            border-bottom: 1px solid #cccccc;
+            flex-shrink: 0; /* Prevent controls from shrinking */
+        }
+        #status {
+            margin-left: 10px;
+            font-style: italic;
+            color: #333;
+        }
+        #canvas-container { /* Container for the canvas */
+             flex-grow: 1; /* Allow canvas container to fill remaining space */
+             display: flex; /* Center canvas within container */
+             justify-content: center;
+             align-items: center;
+             background-color: black; /* Black background behind canvas */
+             overflow: hidden; /* Hide any canvas overflow */
+        }
+        canvas.emscripten {
+          border: 0px none;
+          background-color: black; /* Match container background */
+          /* Let raylib handle canvas size, or set fixed size here if needed */
+          /* width: 1600px; */
+          /* height: 900px; */
+        }
+        #output { /* Style the output log textarea */
+            display: none; /* Hide the log output area by default */
+            width: 98%;
+            height: 100px;
+            margin: 5px;
+            border: 1px solid gray;
+            font-family: monospace;
+            font-size: 10px;
+        }
     </style>
     <script type='text/javascript' src="https://cdn.jsdelivr.net/gh/eligrey/FileSaver.js/dist/FileSaver.min.js"> </script>
     <script type='text/javascript'>
-        function saveFileFromMEMFSToDisk(memoryFSname, localFSname)     // This can be called by C/C++ code
+        // Function to save file from MEMFS (useful if you want to save weights *from* the browser)
+        function saveFileFromMEMFSToDisk(memoryFSname, localFSname)
         {
-            var isSafari = false; // Not supported, navigator.userAgent access is being restricted
-            //var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-            var data = FS.readFile(memoryFSname);
-            var blob;
+            console.log(`Attempting to save MEMFS file '${memoryFSname}' as '${localFSname}'`);
+            var isSafari = false; // Consider robust browser detection if needed
+            try {
+                var data = FS.readFile(memoryFSname);
+                var blob;
 
-            if (isSafari) blob = new Blob([data.buffer], { type: "application/octet-stream" });
-            else blob = new Blob([data.buffer], { type: "application/octet-binary" });
+                if (isSafari) blob = new Blob([data.buffer], { type: "application/octet-stream" });
+                else blob = new Blob([data.buffer], { type: "application/octet-binary" });
 
-            // NOTE: SaveAsDialog is a browser setting. For example, in Google Chrome,
-            // in Settings/Advanced/Downloads section you have a setting:
-            // 'Ask where to save each file before downloading' - which you can set true/false.
-            // If you enable this setting it would always ask you and bring the SaveAsDialog
-            saveAs(blob, localFSname);
+                saveAs(blob, localFSname);
+                console.log(`File saved successfully.`);
+            } catch (e) {
+                console.error(`Error saving file from MEMFS: `, e);
+                alert(`Failed to save file: ${e.message || e}`);
+            }
+        }
+
+        function setupFileLoader(module)
+        {
+            const fileInput = document.getElementById('weightsFileInput');
+            const statusElement = document.getElementById('status');
+
+            if (!fileInput || !statusElement || !module) {
+                console.error("File loader setup failed: HTML Elements or Emscripten Module not found.");
+                if(statusElement) statusElement.textContent = "Error: File loader UI elements missing.";
+                return;
+            }
+
+            console.log("Setting up file loader. Checking Module object:", module);
+            console.log("Checking for Module.ccall:", typeof module.ccall);
+            console.log("Checking for Module._loadWeightsFromBuffer (direct export):", typeof module._loadWeightsFromBuffer); // Check direct export too
+
+            let loadFuncExists = false;
+            if (typeof module.ccall !== 'function') {
+                console.error("Critical Error: Module.ccall runtime method not found or not exported!");
+                statusElement.textContent = "Error: Emscripten runtime issue (ccall missing).";
+                fileInput.disabled = true;
+                return;
+            }
+
+            console.log("Proceeding to add event listener for file input.");
+
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) {
+                    statusElement.textContent = 'No file selected.';
+                    return;
+                }
+
+                if (!file.name.endsWith('.data')) {
+                     statusElement.textContent = 'Please select a .data file.';
+                     fileInput.value = ''; // Reset input
+                     return;
+                }
+
+
+                statusElement.textContent = `Reading file: ${file.name}...`;
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    const fileData = e.target.result; // This is an ArrayBuffer
+                    if (!fileData || fileData.byteLength === 0) {
+                        statusElement.textContent = `Error: File ${file.name} is empty or could not be read.`;
+                        console.error(`FileReader onload: ArrayBuffer is null or empty for ${file.name}`);
+                         fileInput.value = ''; // Reset input
+                        return;
+                    }
+                    statusElement.textContent = `File read (${fileData.byteLength} bytes). Loading into network...`;
+
+                    let pointer = 0;
+                    let success = false;
+                    try {
+                        // 1. Allocate memory in WASM heap
+                        console.log(`Allocating ${fileData.byteLength} bytes in WASM heap...`);
+                        pointer = module._malloc(fileData.byteLength);
+                        if (pointer === 0) {
+                            throw new Error(`Failed to allocate ${fileData.byteLength} bytes in WASM heap.`);
+                        }
+                        console.log(`Allocated memory at address: ${pointer}`);
+
+                        // 2. Copy data from ArrayBuffer to WASM heap
+                        console.log("Copying data to WASM heap...");
+                        module.HEAPU8.set(new Uint8Array(fileData), pointer);
+                        console.log("Data copied.");
+
+                        // 3. Call C++ function via ccall
+                        console.log("Calling C++ loadWeightsFromBuffer...");
+                        success = module.ccall(
+                            'loadWeightsFromBuffer', // Function name
+                            'boolean',              // Return type
+                            ['number', 'number'],   // Argument types (pointer, size)
+                            [pointer, fileData.byteLength] // Arguments
+                        );
+                         console.log(`C++ function returned: ${success}`);
+
+                        if (success) {
+                             statusElement.textContent = `Weights loaded successfully from ${file.name}!`;
+                             console.log("Weights loading process completed successfully.");
+                        } else {
+                             // Error message should ideally come from C++ via console.error
+                             throw new Error(`C++ function reported failure loading weights from ${file.name}. Check C++ logs.`);
+                        }
+
+                    } catch (error) {
+                        statusElement.textContent = `Error loading weights: ${error.message || error}`;
+                        console.error("Error during weights loading:", error);
+                        success = false; // Ensure success is false on error
+                    } finally {
+                        // 4. Free allocated memory
+                        if (pointer !== 0) {
+                            console.log(`Freeing WASM memory at address: ${pointer}`);
+                            module._free(pointer);
+                            console.log("WASM memory freed.");
+                        } else {
+                             console.log("No WASM memory to free (allocation failed or pointer was zero).");
+                        }
+                         // Reset file input so the same file can be selected again
+                        fileInput.value = '';
+                        console.log("File input reset.");
+                    }
+                };
+
+                reader.onerror = (e) => {
+                    statusElement.textContent = 'Error reading file.';
+                    console.error("FileReader error:", e);
+                    fileInput.value = ''; // Reset input on error too
+                };
+
+                // Start reading the file as an ArrayBuffer
+                reader.readAsArrayBuffer(file);
+            });
+
+             statusElement.textContent = "Ready to load weights file (.data)";
+             console.log("File loader setup complete. Waiting for file selection.");
         }
     </script>
 
-    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     </head>
     <body>
-        <canvas class=emscripten id=canvas oncontextmenu=event.preventDefault() tabindex=-1></canvas>
-        <p id="output" />
+        <div id="controls">
+            <label for="weightsFileInput">Load Weights:</label>
+            <input type="file" id="weightsFileInput" accept=".data"> <!-- Accept only .data files -->
+            <span id="status">Initializing...</span> <!-- Status message area -->
+            <!-- Optional: Add a button to trigger save from MEMFS -->
+            <!-- <button onclick="saveFileFromMEMFSToDisk('/weights.data', 'downloaded_weights.data')">Save Current Weights</button> -->
+        </div>
+
+        <div id="canvas-container">
+             <canvas class=emscripten id=canvas oncontextmenu=event.preventDefault() tabindex=-1></canvas>
+        </div>
+
+        <!-- Hidden text area for C/C++ stdout/stderr -->
+        <textarea id="output" rows="8"></textarea>
+
         <script>
             var Module = {
-                print: (function() {
+                preRun: [], // Use preRun for tasks before main() starts
+                postRun: [ function() { // Use postRun for tasks after main() exits (or runtime initialized)
+                    console.log("WASM Runtime Initialized (postRun). Setting up file loader...");
+                    // Ensure Module object is fully available before calling setup
+                    if (typeof setupFileLoader === 'function') {
+                         setupFileLoader(Module);
+                    } else {
+                        console.error("setupFileLoader function not defined when postRun executed!");
+                    }
+                    console.log("postRun execution complete.");
+                  } ],
+                print: (function() { // Capture stdout
                     var element = document.getElementById('output');
-                    if (element) element.value = ''; // clear browser cache
+                    if (element) element.value = ''; // Clear on load
                     return function(text) {
                         if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
-                        console.log(text);
+                        console.log(text); // Log to browser console
                         if (element) {
                           element.value += text + "\n";
-                          element.scrollTop = element.scrollHeight; // focus on bottom
+                          element.scrollTop = element.scrollHeight; // Auto-scroll
                         }
                     };
                 })(),
+                 printErr: function(text) { // Capture stderr
+                    if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+                    console.error(text); // Log errors to browser console
+                    var element = document.getElementById('output');
+                    if (element) {
+                        element.value += "ERROR: " + text + "\n"; // Prefix stderr in textarea
+                        element.scrollTop = element.scrollHeight; // Auto-scroll
+                    }
+                },
                 canvas: (function() {
                     var canvas = document.getElementById('canvas');
+
+                    // Recommended: Handle high-DPI displays
+                    canvas.addEventListener("webglcontextlost", function(e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
+
                     return canvas;
-                })()
+                })(),
+                setStatus: function(text) { // Handle status updates from Emscripten itself
+                    if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+                    if (text === Module.setStatus.last.text) return;
+                    var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+                    var now = Date.now();
+                    if (m && now - Module.setStatus.last.time < 30) return; // Throttle updates
+                    Module.setStatus.last.time = now;
+                    Module.setStatus.last.text = text;
+                     // You could update the #status span here too if desired
+                     // const statusElement = document.getElementById('status');
+                     // if (statusElement) statusElement.textContent = text;
+                    console.log("Emscripten Status: ", text);
+                },
+                totalDependencies: 0,
+                monitorRunDependencies: function(left) {
+                    this.totalDependencies = Math.max(this.totalDependencies, left);
+                    Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+                }
             };
+            // Display initial message
+            Module.setStatus('Downloading...');
+            window.onerror = function(event) { // Global error handler
+                Module.setStatus('Exception thrown, see JavaScript console');
+                console.error("Unhandled window error:", event);
+             };
         </script>
-        {{{ SCRIPT }}}
+        {{{ SCRIPT }}} <!-- Emscripten replaces this with the generated JS -->
     </body>
 </html>

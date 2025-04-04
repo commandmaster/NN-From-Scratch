@@ -8,6 +8,24 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
+NeuralNetwork<784, 10, 80, 80>* g_neuralNetworkPtr = nullptr;
+#endif
+
+#ifdef __EMSCRIPTEN__
+extern "C" {
+
+bool loadWeightsFromBuffer(const char* buffer_ptr, size_t buffer_size) {
+    if (!g_neuralNetworkPtr) 
+    {
+        std::cerr << "ERROR: Global neural network pointer is null in loadWeightsFromBuffer!" << std::endl;
+        return false;
+    }
+
+    return g_neuralNetworkPtr->loadWeightsFromBuffer(buffer_ptr, buffer_size);
+}
+
+} // extern "C"
+
 #endif
 
 int main() {
@@ -35,6 +53,10 @@ int main() {
 
 
     NeuralNetwork<784, 10, 80, 80> myNN;
+
+    #ifdef __EMSCRIPTEN__
+		g_neuralNetworkPtr = &myNN; // Assign the global pointer 
+    #endif
 
     #ifndef __EMSCRIPTEN__
 		myNN.loadWeights(weightsPath);
@@ -67,7 +89,8 @@ int main() {
         BeginDrawing();
 
         ClearBackground(RAYWHITE);
-        myNN.train(images, labels, 0.001, index);
+        myNN.train(images, labels, 0.002, index);
+
         //myNN.test(testImage, testLabel);
 
         NeuralRenderer::RenderNetwork<784, 10, 80, 80>(myNN);
@@ -83,9 +106,8 @@ int main() {
             std::cout << "Saving weights and biases... \n";
             #endif // __EMSCRIPTEN__
 
-                    }
+        }
         index++;
-        index = index % images.rows();
     }
 
     CloseWindow();
