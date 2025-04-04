@@ -1,13 +1,18 @@
 ﻿#pragma once
-#include <bits/stdc++.h>
+#include <vector>
+#include <array>
+#include <cmath>       
 #include <chrono>
 #include <random>
 #include <fstream>
+#include <iostream>    
+#include <algorithm>   
+#include <cstddef>     
+#include <string>      
+#include <numeric>     
 
 #include <raylib.h>
-
-// Eigen Core
-#include <Core>
+#include "Eigen/Core"
 
 typedef float Scalar;
 

@@ -90,7 +90,7 @@ public:
 
 				if (i == layerCount - 1)
                 {
-                    DrawText(std::to_string(static_cast<int>(nn.softmaxOutput(0, j) * 100)).c_str(), xPos - 5, yPos - 5, 20, BLACK);
+                    DrawText((std::to_string(static_cast<int>(nn.softmaxOutput(0, j) * 100)) + "%").c_str(), xPos - 5, yPos - 5, 20, BLACK);
                 }
             }
         }

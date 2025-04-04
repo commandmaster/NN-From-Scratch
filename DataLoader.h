@@ -1,8 +1,19 @@
 #pragma once
 
-#include "Core"
-#include <bits/stdc++.h>
-#include <intrin.h>
+#include "Eigen/Core" 
+#include <vector>
+#include <string>
+#include <fstream>
+#include <stdexcept>
+#include <cstdint> 
+#include <iostream> 
+#include <algorithm> 
+
+inline uint32_t swap_uint32(uint32_t val) 
+{
+	val = ((val << 8) & 0xFF00FF00) | ((val >> 8) & 0xFF00FF);
+	return (val << 16) | (val >> 16);
+}
 
 class DataLoader
 {
@@ -18,7 +29,7 @@ public:
     {
 		uint32_t value = 0;
 		file.read(reinterpret_cast<char*>(&value), sizeof(value));
-		return _byteswap_ulong(value); 
+		return swap_uint32(value); 
 	}
 
 	static Eigen::MatrixXf load_mnist_images(const std::string &filename) 
